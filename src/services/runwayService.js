@@ -1,5 +1,6 @@
 // src/services/runwayService.js
 
+// NOTE: We use the proxy path defined in vite.config.js
 const API_BASE = "/runway-api";
 const RUNWAY_VERSION = "2024-11-06";
 
@@ -11,6 +12,7 @@ const resizeAndConvertImage = (url) => {
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
+            // Max 1024 is optimal for Gen-4
             const MAX_SIZE = 1024;
             if (width > height) {
                 if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
@@ -21,7 +23,8 @@ const resizeAndConvertImage = (url) => {
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.9));
+            // High quality jpeg
+            resolve(canvas.toDataURL('image/jpeg', 0.95));
         };
         img.onerror = () => reject("Could not load image");
         img.src = url;
@@ -84,34 +87,40 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
         const baseUri = await resizeAndConvertImage(baseImage);
         const jewelryUri = await resizeAndConvertImage(jewelryItem.src);
 
-        // --- DYNAMIC PROMPT LOGIC ---
+        // --- NATURAL BLEND PROMPT LOGIC ---
         let prompt = "";
 
-        // CHECK TYPE: Is it Clothing or Jewelry?
         if (jewelryItem.type === 'clothing') {
-            // --- CLOTHING PROMPT (Whole body replacement) ---
+            // --- CLOTHING (Saree/Kurta) ---
             prompt = `
-          A photorealistic image where the person in the first reference image is wearing the OUTFIT from the second reference image.
+          A realistic photo composite where the person in Reference Image 1 is wearing the outfit from Reference Image 2.
 
-          STRICT INSTRUCTIONS:
-          1. IDENTITY: Keep the person's face, hair, skin tone, and body shape exactly the same.
-          2. CLOTHING SWAP: Completely replace the person's current clothes with the Saree/Dress/Kurta from the second image.
-          3. FIT: Ensure the new outfit fits the person's body perfectly. Maintain realistic fabric folds, draping, and texture.
-          4. DETAILS: Transfer the exact color, pattern, and embroidery of the reference outfit.
-          5. COMPOSITION: Do not crop the head. Keep the background neutral.
+          INSTRUCTIONS:
+          1. IDENTITY: Keep the person's face, hair, and body shape exactly the same.
+          2. OUTFIT: Replace the original clothes with the Saree/Dress from Image 2.
+          3. NATURAL LOOK: Do not add studio lighting or filters. Match the lighting and resolution of the original user photo.
+          4. FIT: The clothes should fit the person naturally with realistic folds.
+          5. RESULT: It should look like a normal photo taken of the person wearing these clothes, not a digital art piece.
         `;
         } else {
-            // --- JEWELRY PROMPT (Add object) ---
+            // --- JEWELRY (Necklace/Earrings) ---
             const placement = jewelryItem.type === 'earring' ? 'ears' : 'neck';
-            prompt = `
-          A photorealistic composite image combining the person from the first reference image and the jewelry from the second reference image.
 
-          TASK: Transfer the jewelry OBJECT from the second image onto the ${placement} of the person in the first image.
+            // Physics instructions for fit
+            const physics = jewelryItem.type === 'necklace'
+                ? "The necklace must sit naturally on the skin of the neck/collarbone area. It should not look like a sticker."
+                : "The earrings must hang naturally from the earlobes.";
+
+            prompt = `
+          A realistic photo composite. Put the Jewelry from Reference Image 2 onto the ${placement} of the Person in Reference Image 1.
 
           STRICT RULES:
-          1. EXACT REPLICA: Use the EXACT design and texture of the jewelry reference.
-          2. IDENTITY: Keep the person's face, hair, and skin tone identical.
-          3. PHYSICS: The jewelry must drape naturally on the ${placement}. Apply gravity so it sits flat against the skin.
+          1. KEEP THE PERSON EXACTLY THE SAME. Do not change their face or skin tone.
+          2. KEEP THE JEWELRY EXACTLY THE SAME. Keep the gold texture and design details.
+          3. NATURAL LIGHTING: Match the lighting of the jewelry to the person's skin. Do not make it overly shiny or fake.
+          4. POSITION: ${physics}
+          
+          STYLE: Natural photography. Realistic blend. No CGI effects.
         `;
         }
 
