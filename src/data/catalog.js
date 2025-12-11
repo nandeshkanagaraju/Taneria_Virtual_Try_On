@@ -2,9 +2,9 @@
 
 export const JEWELRY_CATALOG = [
     { id: 1, name: "Royal Gold Necklace", type: "necklace", src: "/images/necklace1.png" },
-    { id: 2, name: "Diamond Drop Earrings", type: "earring", src: "/images/necklace2.png" },
-    { id: 3, name: "Emerald Pendant", type: "necklace", src: "/images/necklace3.png" },
-    { id: 4, name: "Pearl Choker", type: "necklace", src: "/images/necklace4.png" },
+    { id: 2, name: "Diamond necklace", type: "necklace", src: "/images/necklace8.png" },
+    { id: 3, name: "Diamond earring", type: "earring", src: "/images/earring.png" },
+    { id: 4, name: "Blossom Crest Gold Necklace", type: "necklace", src: "/images/necklace6.png" },
 ];
 
 export const APPAREL_CATALOG = [
@@ -19,7 +19,7 @@ export const APPAREL_CATALOG = [
         id: 102,
         name: "Red Silk Saree",
         type: "clothing",
-        src: "https://png.pngtree.com/png-clipart/20230916/original/pngtree-red-saree-png-image_12239462.png"
+        src: "/images/saree1.png"
     },
     {
         id: 103,

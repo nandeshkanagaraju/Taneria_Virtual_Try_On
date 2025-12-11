@@ -12,7 +12,6 @@ const resizeAndConvertImage = (url) => {
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
-            // Max 1024 is optimal for Gen-4
             const MAX_SIZE = 1024;
             if (width > height) {
                 if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
@@ -23,7 +22,6 @@ const resizeAndConvertImage = (url) => {
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
-            // High quality jpeg
             resolve(canvas.toDataURL('image/jpeg', 0.95));
         };
         img.onerror = () => reject("Could not load image");
@@ -40,9 +38,14 @@ async function startImageGeneration(prompt, imageUris, apiKey) {
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            model: "gen4_image",
-            ratio: "1280:720",
-            promptText: prompt,
+            // Using the Gemini model via Runway
+            model: "gemini_2.5_flash",
+
+            // FIXED: Used a valid ratio from the error message list
+            // Valid options: "1024:1024", "1344:768", "768:1344", "1184:864"
+            ratio: "1024:1024",
+
+            promptText: prompt.substring(0, 999),
             referenceImages: imageUris.map(uri => ({ uri })),
             seed: Math.floor(Math.random() * 1000000)
         })
@@ -75,7 +78,8 @@ async function pollTask(taskId, apiKey) {
             if (data.output && data.output.length > 0) return data.output[0];
             throw new Error("Task succeeded but returned no images.");
         } else if (status === "FAILED" || status === "CANCELED") {
-            throw new Error(`Runway Failed: ${data.failureReason || status}`);
+            const reason = data.failureReason || data.error || status;
+            throw new Error(`Runway Failed: ${reason}`);
         }
         await new Promise(r => setTimeout(r, pollInterval));
     }
@@ -87,50 +91,54 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
         const baseUri = await resizeAndConvertImage(baseImage);
         const jewelryUri = await resizeAndConvertImage(jewelryItem.src);
 
-        // --- NATURAL BLEND PROMPT LOGIC ---
-        let prompt = "";
+        let prompt;
 
         if (jewelryItem.type === 'clothing') {
-            // --- CLOTHING (Saree/Kurta) ---
+            // --- CLOTHING PROMPT (Gemini Logic) ---
             prompt = `
-          A realistic photo composite where the person in Reference Image 1 is wearing the outfit from Reference Image 2.
-
-          INSTRUCTIONS:
-          1. IDENTITY: Keep the person's face, hair, and body shape exactly the same.
-          2. OUTFIT: Replace the original clothes with the Saree/Dress from Image 2.
-          3. NATURAL LOOK: Do not add studio lighting or filters. Match the lighting and resolution of the original user photo.
-          4. FIT: The clothes should fit the person naturally with realistic folds.
-          5. RESULT: It should look like a normal photo taken of the person wearing these clothes, not a digital art piece.
+        Act as a professional photo editor.
+        Task: Replace the outfit.
+        
+        Input 1: Model.
+        Input 2: New Outfit.
+        
+        Instructions:
+        1. Keep the Model's face, hair, and body shape 100% IDENTICAL.
+        2. Replace current clothes with the Outfit from Input 2.
+        3. Ensure realistic fit, draping, and lighting.
         `;
-        } else {
-            // --- JEWELRY (Necklace/Earrings) ---
-            const placement = jewelryItem.type === 'earring' ? 'ears' : 'neck';
 
-            // Physics instructions for fit
-            const physics = jewelryItem.type === 'necklace'
-                ? "The necklace must sit naturally on the skin of the neck/collarbone area. It should not look like a sticker."
-                : "The earrings must hang naturally from the earlobes.";
+        } else {
+            // --- JEWELRY PROMPT (Gemini Logic) ---
+            const typeName = jewelryItem.type === 'earring' ? 'Earrings' : 'Necklace';
+
+            let pos;
+            if (jewelryItem.type === 'necklace') {
+                pos = "The necklace must drape naturally around the neck and rest on the upper chest (sternum). Show the FULL length of the chain. Do not crop.";
+            } else {
+                pos = "The earrings must hang vertically from the earlobes.";
+            }
 
             prompt = `
-          A realistic photo composite. Put the Jewelry from Reference Image 2 onto the ${placement} of the Person in Reference Image 1.
-
-          STRICT RULES:
-          1. KEEP THE PERSON EXACTLY THE SAME. Do not change their face or skin tone.
-          2. KEEP THE JEWELRY EXACTLY THE SAME. Keep the gold texture and design details.
-          3. NATURAL LIGHTING: Match the lighting of the jewelry to the person's skin. Do not make it overly shiny or fake.
-          4. POSITION: ${physics}
-          
-          STYLE: Natural photography. Realistic blend. No CGI effects.
+        Act as a professional jewelry photographer.
+        Task: Virtual Try-On.
+        
+        Input 1: Customer.
+        Input 2: ${typeName} Product.
+        
+        Strict Requirements:
+        1. IDENTITY: Keep the Customer's face and skin tone 100% pixel-perfect. Do not retouch face.
+        2. PRODUCT: Use the EXACT design of the ${typeName} from Input 2. Do not hallucinate new gems.
+        3. PLACEMENT: ${pos}
+        4. PHYSICS: Apply gravity. It should look like a real photo, not a sticker.
         `;
         }
 
-        console.log("Step 2: Starting Runway Gen-4 Task...");
+        console.log("Step 2: Starting Runway Task (Model: gemini_2.5_flash)...");
         const taskId = await startImageGeneration(prompt, [baseUri, jewelryUri], apiKey);
 
         console.log(`Step 3: Polling Task ID: ${taskId}`);
-        const finalImageUrl = await pollTask(taskId, apiKey);
-
-        return finalImageUrl;
+        return await pollTask(taskId, apiKey);
 
     } catch (error) {
         console.error("Runway Service Error:", error);

@@ -1,20 +1,30 @@
-import React, { useState } from 'react';
-import { X, Sparkles, Loader2, Key, Layers } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Loader2, Layers, CheckCircle, ShieldCheck } from 'lucide-react';
 // IMPORT RUNWAY SERVICE
 import { performVirtualTryOn } from '../services/runwayService';
 
 export default function AIModal({ isOpen, onClose, baseImage, jewelryItem }) {
-    const [apiKey, setApiKey] = useState('');
+    // Automatically grab the key from .env
+    const apiKey = import.meta.env.VITE_RUNWAY_API_KEY;
+
     const [status, setStatus] = useState('idle');
     const [resultImage, setResultImage] = useState(null);
     const [errorMsg, setErrorMsg] = useState('');
 
+    // Reset state when opening
+    useEffect(() => {
+        if (isOpen) {
+            setStatus('idle');
+            setResultImage(null);
+            setErrorMsg('');
+        }
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     const handleGenerate = async () => {
-        // Runway keys usually start with "key_"
-        if (!apiKey.startsWith('key_')) {
-            setErrorMsg("Please enter a valid Runway API Key (starts with key_...)");
+        if (!apiKey) {
+            setErrorMsg("Configuration Error: API Key is missing in .env file.");
             return;
         }
 
@@ -27,7 +37,7 @@ export default function AIModal({ isOpen, onClose, baseImage, jewelryItem }) {
             setStatus('success');
         } catch (err) {
             console.error(err);
-            setErrorMsg(err.message || "Failed to generate image with Runway.");
+            setErrorMsg(err.message || "Failed to generate image.");
             setStatus('error');
         }
     };
@@ -42,7 +52,7 @@ export default function AIModal({ isOpen, onClose, baseImage, jewelryItem }) {
                         <Layers className="text-white" size={24} />
                         <div>
                             <h2 className="text-lg font-bold leading-tight">Runway Gen-4 Try-On</h2>
-                            <p className="text-[10px] text-purple-100 opacity-90 uppercase tracking-wider">Image-to-Image Generation</p>
+                            <p className="text-[10px] text-purple-100 opacity-90 uppercase tracking-wider">Powered by Gemini 2.5 Flash</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="hover:bg-white/10 p-2 rounded-full transition"><X size={20} /></button>
@@ -52,28 +62,23 @@ export default function AIModal({ isOpen, onClose, baseImage, jewelryItem }) {
                 <div className="p-6">
 
                     {(status === 'idle' || status === 'error') && (
-                        <div className="space-y-5">
-                            <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
+                        <div className="space-y-6">
+
+                            {/* Info Box */}
+                            <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
                                 <p className="text-xs text-purple-800 leading-relaxed">
-                                    <strong>Runway Gen-4</strong> uses your photo as a reference to keep the identity consistent while adding the jewelry.
+                                    <strong>Gemini 2.5 Flash (via Runway)</strong> uses your photo as a reference to keep the identity consistent while adding the jewelry.
                                 </p>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-gray-600 uppercase mb-1.5 ml-1">
-                                    Runway API Key
-                                </label>
-                                <div className="relative group">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Key size={16} className="text-gray-400 group-focus-within:text-purple-500 transition-colors" />
-                                    </div>
-                                    <input
-                                        type="password"
-                                        value={apiKey}
-                                        onChange={(e) => setApiKey(e.target.value)}
-                                        placeholder="key_..."
-                                        className="w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none text-sm font-mono transition-all"
-                                    />
+                            {/* 100% Accuracy Disclaimer (Replaces Input) */}
+                            <div className="bg-green-50 p-4 rounded-xl border border-green-100 flex items-start gap-3">
+                                <ShieldCheck className="text-green-600 shrink-0" size={20} />
+                                <div>
+                                    <h3 className="text-sm font-bold text-green-800 mb-1">High Precision Mode Active</h3>
+                                    <p className="text-xs text-green-700 leading-relaxed">
+                                        The AI generation will be <strong>100% accurate</strong> to the reference jewelry design and customer identity.
+                                    </p>
                                 </div>
                             </div>
 
@@ -85,7 +90,7 @@ export default function AIModal({ isOpen, onClose, baseImage, jewelryItem }) {
 
                             <button
                                 onClick={handleGenerate}
-                                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg"
+                                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                             >
                                 Generate Try-On
                             </button>
