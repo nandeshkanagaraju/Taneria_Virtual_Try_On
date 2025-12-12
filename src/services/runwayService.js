@@ -38,11 +38,10 @@ async function startImageGeneration(prompt, imageUris, apiKey) {
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            // Using the Gemini model via Runway
+            // --- SWITCHED TO GEMINI MODEL ---
             model: "gemini_2.5_flash",
 
-            // FIXED: Used a valid ratio from the error message list
-            // Valid options: "1024:1024", "1344:768", "768:1344", "1184:864"
+            // Gemini works best with Square ratio for consistency
             ratio: "1024:1024",
 
             promptText: prompt.substring(0, 999),
@@ -87,50 +86,53 @@ async function pollTask(taskId, apiKey) {
 
 export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
     try {
-        console.log("Step 1: Resizing & Preparing Images...");
+        console.log("Step 1: Preparing Images for Gemini...");
         const baseUri = await resizeAndConvertImage(baseImage);
         const jewelryUri = await resizeAndConvertImage(jewelryItem.src);
 
         let prompt;
 
+        // Gemini prefers "Role Playing" and "Natural Language" instructions
         if (jewelryItem.type === 'clothing') {
-            // --- CLOTHING PROMPT (Gemini Logic) ---
+            // --- CLOTHING PROMPT ---
             prompt = `
-        Act as a professional photo editor.
-        Task: Replace the outfit.
-        
-        Input 1: Model.
-        Input 2: New Outfit.
-        
-        Instructions:
-        1. Keep the Model's face, hair, and body shape 100% IDENTICAL.
-        2. Replace current clothes with the Outfit from Input 2.
-        3. Ensure realistic fit, draping, and lighting.
+          Act as a professional photo editor.
+          Task: Replace the outfit on the person in Image 1 with the outfit in Image 2.
+          
+          Instructions:
+          1. Remove the current clothes completely.
+          2. Fit the new outfit naturally onto the person's body.
+          3. STRICTLY preserve the face, hair, and skin tone. Do not retouch the face.
+          4. Ensure the background remains unchanged.
         `;
-
         } else {
-            // --- JEWELRY PROMPT (Gemini Logic) ---
+            // --- JEWELRY PROMPT (With Removal Logic) ---
             const typeName = jewelryItem.type === 'earring' ? 'Earrings' : 'Necklace';
+            const targetArea = jewelryItem.type === 'earring' ? 'ears' : 'neck';
 
             let pos;
             if (jewelryItem.type === 'necklace') {
-                pos = "The necklace must drape naturally around the neck and rest on the upper chest (sternum). Show the FULL length of the chain. Do not crop.";
+                pos = "The necklace must rest naturally on the skin of the upper chest/sternum. Show the full length of the chain. Do not crop it.";
             } else {
                 pos = "The earrings must hang vertically from the earlobes.";
             }
 
             prompt = `
-        Act as a professional jewelry photographer.
-        Task: Virtual Try-On.
-        
-        Input 1: Customer.
-        Input 2: ${typeName} Product.
-        
-        Strict Requirements:
-        1. IDENTITY: Keep the Customer's face and skin tone 100% pixel-perfect. Do not retouch face.
-        2. PRODUCT: Use the EXACT design of the ${typeName} from Input 2. Do not hallucinate new gems.
-        3. PLACEMENT: ${pos}
-        4. PHYSICS: Apply gravity. It should look like a real photo, not a sticker.
+          Act as a professional jewelry retoucher.
+          Task: Virtual Try-On.
+          
+          Input 1: Customer Photo.
+          Input 2: ${typeName} Product.
+          
+          CRITICAL STEP - CLEANUP:
+          If the customer is already wearing any jewelry on their ${targetArea}, REMOVE IT FIRST. Erase the old jewelry and reconstruct the skin texture underneath.
+          
+          EXECUTION:
+          1. Place the new ${typeName} (Input 2) onto the customer.
+          2. Placement: ${pos}
+          3. Identity: Keep the customer's face 100% identical.
+          4. Product: Use the exact design from Input 2.
+          5. Physics: Apply natural gravity and shadows.
         `;
         }
 
