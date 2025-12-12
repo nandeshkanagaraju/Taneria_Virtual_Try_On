@@ -124,35 +124,46 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
         if (jewelryItem.type === 'clothing') {
             prompt = `
         Task: High-Fidelity Garment Transfer.
-        Input 1: Model.
-        Input 2: Garment.
+        Input 1: Model (Customer).
+        Input 2: Garment (Product).
         
         FRAMING: Maintain exact aspect ratio. Do not crop.
         
         INSTRUCTIONS:
-        1. Texture Map: Wrap the EXACT fabric from Input 2 onto the Model.
-        2. Identity: Keep the Model's face and body 100% identical.
+        1. Texture Map: Wrap the EXACT fabric and pattern from Input 2 onto the Model.
+        2. Identity: Keep the Model's face, body, and background 100% identical.
+        
+        REALISM & FIDELITY:
+        - Photographic quality: Ultra-realistic, high-resolution, sharp focus, professional studio lighting.
+        - Seamless integration: The new garment must be perfectly blended, matching the original's lighting, shadow, and color temperature.
+        - Material accuracy: Ensure natural fabric folds, drapes, and wrinkles that correspond to the Model's pose and body shape.
         `;
 
         } else if (jewelryItem.type === 'set') {
             prompt = `
-        Task: Technical Photo Composite.
+        Task: Technical Photo Composite (Jewelry Set).
         Input 1: Customer.
-        Input 2: Jewelry Set.
+        Input 2: Jewelry Set (Product).
 
         FRAMING:
         - DO NOT CROP. Maintain full view of chest/shoulders.
 
         CRITICAL CLEANUP:
-        - If Customer is wearing OLD jewelry, ERASE IT completely.
+        - If Customer is wearing OLD jewelry, ERASE IT completely and cleanly.
 
         STRICT RULES:
-        1. NO NEW GEMS: Use ONLY the design from Input 2.
-        2. COLOR LOCK: Do not change stone colors.
+        1. NO NEW GEMS: Use ONLY the design, cut, and material from Input 2.
+        2. COLOR LOCK: Do not change stone or metal colors.
+        3. IDENTITY: Keep face, skin tone, hair, and background 100% identical.
 
         PLACEMENT:
-        - Necklace: Rest on upper chest. Show full length.
-        - Earrings: Hang vertically from earlobes.
+        - Necklace: Rest naturally on the upper chest/sternum. Show full length.
+        - Earrings: Hang vertically from the earlobes.
+        
+        REALISM & FIDELITY:
+        - Photographic quality: Ultra-realistic, high-resolution, sharp focus, professional studio lighting.
+        - Seamless integration: The jewelry must be perfectly blended, matching the original's lighting, shadow, and color temperature.
+        - Material accuracy: Ensure realistic reflections, specular highlights, and metal sheen on the jewelry. Cast realistic, soft shadows onto the skin.
         `;
 
         } else {
@@ -169,19 +180,24 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
             prompt = `
         Task: Technical Photo Composite (${typeName}).
         Input 1: Customer.
-        Input 2: ${typeName}.
+        Input 2: ${typeName} (Product).
         
         FRAMING RULE: 
         - KEEP ORIGINAL ASPECT RATIO. 
         - DO NOT CROP THE BOTTOM. 
         
         CRITICAL CLEANUP:
-        - Remove any existing jewelry on ${targetArea}.
+        - Remove any existing jewelry on ${targetArea} completely and cleanly.
         
         STRICT RULES:
-        1. NO NEW GEMS: Use ONLY the design from Input 2.
-        2. IDENTITY: Keep face 100% identical.
+        1. NO NEW GEMS: Use ONLY the design, cut, and material from Input 2.
+        2. IDENTITY: Keep face, skin tone, hair, and background 100% identical.
         3. PLACEMENT: ${pos}
+        
+        REALISM & FIDELITY:
+        - Photographic quality: Ultra-realistic, high-resolution, sharp focus, professional studio lighting.
+        - Seamless integration: The jewelry must be perfectly blended, matching the original's lighting, shadow, and color temperature.
+        - Material accuracy: Ensure realistic reflections, specular highlights, and metal sheen on the jewelry. Cast realistic, soft shadows onto the skin.
         `;
         }
 
