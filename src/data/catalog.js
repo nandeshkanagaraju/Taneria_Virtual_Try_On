@@ -33,12 +33,12 @@ export const APPAREL_CATALOG = [
         id: 102,
         name: "Red Silk Saree",
         type: "clothing",
-        src: "/images/saree1.png"
+        src: "/images/saree2.png"
     },
     {
         id: 103,
         name: "Blue Designer Saree",
         type: "clothing",
-        src: "https://png.pngtree.com/png-vector/20240129/ourmid/pngtree-blue-saree-with-golden-border-png-image_11563456.png"
+        src: "/images/saree1.png"
     }
 ];

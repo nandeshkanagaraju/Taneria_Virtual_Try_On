@@ -29,7 +29,7 @@ const resizeAndConvertImage = (url) => {
     });
 };
 
-async function startImageGeneration(prompt, imageUris, apiKey) {
+async function startImageGeneration(prompt, imageUris, apiKey, modelName) {
     const response = await fetch(`${API_BASE}/v1/text_to_image`, {
         method: "POST",
         headers: {
@@ -38,9 +38,12 @@ async function startImageGeneration(prompt, imageUris, apiKey) {
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            // FIXED: Only one model definition
-            model: "gemini_2.5_flash",
+            // DYNAMIC MODEL SELECTION
+            model: modelName,
+
+            // 1024:1024 is the safest ratio supported by BOTH models
             ratio: "1024:1024",
+
             promptText: prompt.substring(0, 999),
             referenceImages: imageUris.map(uri => ({ uri })),
             seed: Math.floor(Math.random() * 1000000)
@@ -74,7 +77,6 @@ async function pollTask(taskId, apiKey) {
             if (data.output && data.output.length > 0) return data.output[0];
             throw new Error("Task succeeded but returned no images.");
         } else if (status === "FAILED" || status === "CANCELED") {
-            // FIXED: Properly access failure reason from the data object
             const reason = data.failureReason || data.error || status;
             throw new Error(`Runway Failed: ${reason}`);
         }
@@ -89,75 +91,82 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
         const jewelryUri = await resizeAndConvertImage(jewelryItem.src);
 
         let prompt;
+        let selectedModel;
+
+        // --- DYNAMIC MODEL SELECTION ---
 
         if (jewelryItem.type === 'clothing') {
-            // --- CLOTHING PROMPT ---
+            // --- 1. CLOTHING -> USE GEN-4 (Better Fabric/Lighting) ---
+            selectedModel = "gen4_image";
+
             prompt = `
-        Act as a photo editor. Replace outfit.
-        Input 1: Model.
-        Input 2: Outfit.
-        
-        Instructions:
-        1. Keep face/hair 100% identical.
-        2. Replace current clothes with Outfit (Input 2).
-        3. Realistic fit and drape.
-        `;
-
-        } else if (jewelryItem.type === 'set') {
-            // --- JEWELRY SET PROMPT ---
-            prompt = `
-        Act as a professional jewelry editor.
-        Task: Virtual Try-On of a Full Jewelry Set.
-        
-        Input 1: Customer.
-        Input 2: Jewelry Set (Contains Necklace AND Earrings).
-
-        CRITICAL CLEANUP:
-        - If Customer is wearing OLD necklace or earrings, ERASE THEM completely.
-        - Restore skin texture before placing new items.
-
-        PLACEMENT RULES:
-        1. Identify the Necklace in Input 2: Place it around the neck, resting on the chest. Show full length.
-        2. Identify the Earrings in Input 2: Place them hanging vertically from the earlobes.
-
-        STRICT REQUIREMENTS:
-        - Face & Skin Identity: 100% Unchanged.
-        - Product Accuracy: Use exact design from Input 2.
-        - Physics: Natural gravity and shadows.
+          Photo composite. Person from Ref 1 wearing Outfit from Ref 2.
+          
+          RULES:
+          1. IDENTITY: Keep face, hair, and body shape 100% same.
+          2. OUTFIT: Replace clothes with Ref 2 (Saree/Dress).
+          3. TEXTURE: Use the exact pattern and border from Ref 2.
+          4. FIT: Realistic drape and fabric folds.
+          5. STYLE: Cinematic lighting, photorealistic.
         `;
 
         } else {
-            // --- SINGLE ITEM PROMPT ---
-            const typeName = jewelryItem.type === 'earring' ? 'Earrings' : 'Necklace';
-            const targetArea = jewelryItem.type === 'earring' ? 'ears' : 'neck';
+            // --- 2. JEWELRY -> USE GEMINI 2.5 (Better Logic/Anatomy) ---
+            selectedModel = "gemini_2.5_flash";
 
-            let pos;
-            if (jewelryItem.type === 'necklace') {
-                pos = "The necklace must rest naturally on the skin of the upper chest/sternum. Show the full length of the chain.";
+            if (jewelryItem.type === 'set') {
+                // JEWELRY SET PROMPT
+                prompt = `
+            Act as a professional jewelry editor.
+            Task: Virtual Try-On of a Full Jewelry Set.
+            Input 1: Customer.
+            Input 2: Jewelry Set (Necklace + Earrings).
+
+            CRITICAL CLEANUP:
+            - If Customer is wearing OLD necklace or earrings, ERASE THEM completely.
+            - Restore skin texture.
+
+            PLACEMENT:
+            1. Necklace: Rest on upper chest/sternum. Show full length.
+            2. Earrings: Hang vertically from earlobes.
+
+            REQUIREMENTS:
+            - Face Identity: 100% Unchanged.
+            - Product: Exact design from Input 2.
+            - Physics: Natural gravity.
+            `;
             } else {
-                pos = "The earrings must hang vertically from the earlobes.";
-            }
+                // SINGLE ITEM PROMPT
+                const typeName = jewelryItem.type === 'earring' ? 'Earrings' : 'Necklace';
+                const targetArea = jewelryItem.type === 'earring' ? 'ears' : 'neck';
 
-            prompt = `
-        Act as a professional jewelry retoucher.
-        Task: Virtual Try-On (${typeName}).
-        
-        Input 1: Customer.
-        Input 2: ${typeName}.
-        
-        CRITICAL CLEANUP:
-        - Remove any existing jewelry on ${targetArea}.
-        
-        EXECUTION:
-        1. Place ${typeName} (Input 2) onto customer.
-        2. Placement: ${pos}
-        3. Identity: Keep face 100% identical.
-        4. Product: Exact design from Input 2.
-        `;
+                let pos;
+                if (jewelryItem.type === 'necklace') {
+                    pos = "The necklace must rest naturally on the skin of the upper chest/sternum. Show the full length of the chain. Do not crop.";
+                } else {
+                    pos = "The earrings must hang vertically from the earlobes.";
+                }
+
+                prompt = `
+            Act as a professional jewelry retoucher.
+            Task: Virtual Try-On (${typeName}).
+            Input 1: Customer.
+            Input 2: ${typeName}.
+            
+            CRITICAL CLEANUP:
+            - Remove any existing jewelry on ${targetArea}.
+            
+            EXECUTION:
+            1. Place ${typeName} (Input 2) onto customer.
+            2. Placement: ${pos}
+            3. Identity: Keep face 100% identical.
+            4. Product: Exact design from Input 2.
+            `;
+            }
         }
 
-        console.log("Step 2: Starting Runway Task (Gemini 2.5 Flash)...");
-        const taskId = await startImageGeneration(prompt, [baseUri, jewelryUri], apiKey);
+        console.log(`Step 2: Starting Runway Task using Model: ${selectedModel}...`);
+        const taskId = await startImageGeneration(prompt, [baseUri, jewelryUri], apiKey, selectedModel);
 
         console.log(`Step 3: Polling Task ID: ${taskId}`);
         return await pollTask(taskId, apiKey);
