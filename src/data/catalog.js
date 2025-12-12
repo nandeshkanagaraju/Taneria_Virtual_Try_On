@@ -19,6 +19,18 @@ export const JEWELRY_SETS_CATALOG = [
         name: "Moyurer Mohima Gold Choker",
         type: "set",
         src: "images/necklaceset2.png"
+    },
+    {
+        id: 203,
+        name: "Gold Choker",
+        type: "set",
+        src: "images/necklaceset3.png"
+    },
+    {
+        id: 203,
+        name: "Majestic Ornate Gold Necklace Set",
+        type: "set",
+        src: "images/necklaceset4.png"
     }
 ];
 

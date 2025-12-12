@@ -4,6 +4,7 @@
 const API_BASE = "/runway-api";
 const RUNWAY_VERSION = "2024-11-06";
 
+// Updated to return Dimensions + Base64
 const resizeAndConvertImage = (url) => {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -12,24 +13,47 @@ const resizeAndConvertImage = (url) => {
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
-            const MAX_SIZE = 1024;
+
+            // Limit max size to 1536 to keep quality high but within API limits
+            const MAX_SIZE = 1536;
+
             if (width > height) {
                 if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
             } else {
                 if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
             }
+
             canvas.width = width;
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.95));
+
+            resolve({
+                base64: canvas.toDataURL('image/jpeg', 0.95),
+                width: width,
+                height: height
+            });
         };
         img.onerror = () => reject("Could not load image");
         img.src = url;
     });
 };
 
-async function startImageGeneration(prompt, imageUris, apiKey, modelName) {
+// Helper to pick the best allowed ratio
+const getBestRatio = (width, height) => {
+    const aspect = width / height;
+
+    // Logic: Map the user's aspect ratio to the closest valid Runway option
+    if (aspect > 1.25) {
+        return "1344:768"; // Landscape
+    } else if (aspect < 0.8) {
+        return "768:1344"; // Portrait (Phone Mode)
+    } else {
+        return "1024:1024"; // Square (Default)
+    }
+};
+
+async function startImageGeneration(prompt, imageUris, apiKey, targetRatio) {
     const response = await fetch(`${API_BASE}/v1/text_to_image`, {
         method: "POST",
         headers: {
@@ -38,11 +62,10 @@ async function startImageGeneration(prompt, imageUris, apiKey, modelName) {
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            // DYNAMIC MODEL SELECTION
-            model: modelName,
+            model: "gemini_2.5_flash",
 
-            // 1024:1024 is the safest ratio supported by BOTH models
-            ratio: "1024:1024",
+            // DYNAMIC RATIO HERE
+            ratio: targetRatio,
 
             promptText: prompt.substring(0, 999),
             referenceImages: imageUris.map(uri => ({ uri })),
@@ -86,87 +109,85 @@ async function pollTask(taskId, apiKey) {
 
 export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
     try {
-        console.log("Step 1: Resizing & Preparing Images...");
-        const baseUri = await resizeAndConvertImage(baseImage);
-        const jewelryUri = await resizeAndConvertImage(jewelryItem.src);
+        console.log("Step 1: Analyzing Image Dimensions...");
+
+        // Get dimensions of the USER image to determine ratio
+        const userImgData = await resizeAndConvertImage(baseImage);
+        const itemImgData = await resizeAndConvertImage(jewelryItem.src);
+
+        // Calculate dynamic ratio
+        const dynamicRatio = getBestRatio(userImgData.width, userImgData.height);
+        console.log(`Detected Ratio: ${userImgData.width}x${userImgData.height} -> Using ${dynamicRatio}`);
 
         let prompt;
-        let selectedModel;
-
-        // --- DYNAMIC MODEL SELECTION ---
 
         if (jewelryItem.type === 'clothing') {
-            // --- 1. CLOTHING -> USE GEN-4 (Better Fabric/Lighting) ---
-            selectedModel = "gen4_image";
-
             prompt = `
-          Photo composite. Person from Ref 1 wearing Outfit from Ref 2.
-          
-          RULES:
-          1. IDENTITY: Keep face, hair, and body shape 100% same.
-          2. OUTFIT: Replace clothes with Ref 2 (Saree/Dress).
-          3. TEXTURE: Use the exact pattern and border from Ref 2.
-          4. FIT: Realistic drape and fabric folds.
-          5. STYLE: Cinematic lighting, photorealistic.
+        Task: High-Fidelity Garment Transfer.
+        Input 1: Model.
+        Input 2: Garment.
+        
+        FRAMING: Maintain exact aspect ratio. Do not crop.
+        
+        INSTRUCTIONS:
+        1. Texture Map: Wrap the EXACT fabric from Input 2 onto the Model.
+        2. Identity: Keep the Model's face and body 100% identical.
+        `;
+
+        } else if (jewelryItem.type === 'set') {
+            prompt = `
+        Task: Technical Photo Composite.
+        Input 1: Customer.
+        Input 2: Jewelry Set.
+
+        FRAMING:
+        - DO NOT CROP. Maintain full view of chest/shoulders.
+
+        CRITICAL CLEANUP:
+        - If Customer is wearing OLD jewelry, ERASE IT completely.
+
+        STRICT RULES:
+        1. NO NEW GEMS: Use ONLY the design from Input 2.
+        2. COLOR LOCK: Do not change stone colors.
+
+        PLACEMENT:
+        - Necklace: Rest on upper chest. Show full length.
+        - Earrings: Hang vertically from earlobes.
         `;
 
         } else {
-            // --- 2. JEWELRY -> USE GEMINI 2.5 (Better Logic/Anatomy) ---
-            selectedModel = "gemini_2.5_flash";
+            const typeName = jewelryItem.type === 'earring' ? 'Earrings' : 'Necklace';
+            const targetArea = jewelryItem.type === 'earring' ? 'ears' : 'neck';
 
-            if (jewelryItem.type === 'set') {
-                // JEWELRY SET PROMPT
-                prompt = `
-            Act as a professional jewelry editor.
-            Task: Virtual Try-On of a Full Jewelry Set.
-            Input 1: Customer.
-            Input 2: Jewelry Set (Necklace + Earrings).
-
-            CRITICAL CLEANUP:
-            - If Customer is wearing OLD necklace or earrings, ERASE THEM completely.
-            - Restore skin texture.
-
-            PLACEMENT:
-            1. Necklace: Rest on upper chest/sternum. Show full length.
-            2. Earrings: Hang vertically from earlobes.
-
-            REQUIREMENTS:
-            - Face Identity: 100% Unchanged.
-            - Product: Exact design from Input 2.
-            - Physics: Natural gravity.
-            `;
+            let pos;
+            if (jewelryItem.type === 'necklace') {
+                pos = "The necklace must rest naturally on the skin of the upper chest/sternum. Show the full length of the chain. Do not crop.";
             } else {
-                // SINGLE ITEM PROMPT
-                const typeName = jewelryItem.type === 'earring' ? 'Earrings' : 'Necklace';
-                const targetArea = jewelryItem.type === 'earring' ? 'ears' : 'neck';
-
-                let pos;
-                if (jewelryItem.type === 'necklace') {
-                    pos = "The necklace must rest naturally on the skin of the upper chest/sternum. Show the full length of the chain. Do not crop.";
-                } else {
-                    pos = "The earrings must hang vertically from the earlobes.";
-                }
-
-                prompt = `
-            Act as a professional jewelry retoucher.
-            Task: Virtual Try-On (${typeName}).
-            Input 1: Customer.
-            Input 2: ${typeName}.
-            
-            CRITICAL CLEANUP:
-            - Remove any existing jewelry on ${targetArea}.
-            
-            EXECUTION:
-            1. Place ${typeName} (Input 2) onto customer.
-            2. Placement: ${pos}
-            3. Identity: Keep face 100% identical.
-            4. Product: Exact design from Input 2.
-            `;
+                pos = "The earrings must hang vertically from the earlobes.";
             }
+
+            prompt = `
+        Task: Technical Photo Composite (${typeName}).
+        Input 1: Customer.
+        Input 2: ${typeName}.
+        
+        FRAMING RULE: 
+        - KEEP ORIGINAL ASPECT RATIO. 
+        - DO NOT CROP THE BOTTOM. 
+        
+        CRITICAL CLEANUP:
+        - Remove any existing jewelry on ${targetArea}.
+        
+        STRICT RULES:
+        1. NO NEW GEMS: Use ONLY the design from Input 2.
+        2. IDENTITY: Keep face 100% identical.
+        3. PLACEMENT: ${pos}
+        `;
         }
 
-        console.log(`Step 2: Starting Runway Task using Model: ${selectedModel}...`);
-        const taskId = await startImageGeneration(prompt, [baseUri, jewelryUri], apiKey, selectedModel);
+        console.log("Step 2: Starting Runway Task...");
+        // Pass the calculated ratio
+        const taskId = await startImageGeneration(prompt, [userImgData.base64, itemImgData.base64], apiKey, dynamicRatio);
 
         console.log(`Step 3: Polling Task ID: ${taskId}`);
         return await pollTask(taskId, apiKey);
