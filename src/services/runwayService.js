@@ -38,12 +38,9 @@ async function startImageGeneration(prompt, imageUris, apiKey) {
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            // --- SWITCHED TO GEMINI MODEL ---
+            // FIXED: Only one model definition
             model: "gemini_2.5_flash",
-
-            // Gemini works best with Square ratio for consistency
             ratio: "1024:1024",
-
             promptText: prompt.substring(0, 999),
             referenceImages: imageUris.map(uri => ({ uri })),
             seed: Math.floor(Math.random() * 1000000)
@@ -77,6 +74,7 @@ async function pollTask(taskId, apiKey) {
             if (data.output && data.output.length > 0) return data.output[0];
             throw new Error("Task succeeded but returned no images.");
         } else if (status === "FAILED" || status === "CANCELED") {
+            // FIXED: Properly access failure reason from the data object
             const reason = data.failureReason || data.error || status;
             throw new Error(`Runway Failed: ${reason}`);
         }
@@ -86,57 +84,79 @@ async function pollTask(taskId, apiKey) {
 
 export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
     try {
-        console.log("Step 1: Preparing Images for Gemini...");
+        console.log("Step 1: Resizing & Preparing Images...");
         const baseUri = await resizeAndConvertImage(baseImage);
         const jewelryUri = await resizeAndConvertImage(jewelryItem.src);
 
         let prompt;
 
-        // Gemini prefers "Role Playing" and "Natural Language" instructions
         if (jewelryItem.type === 'clothing') {
             // --- CLOTHING PROMPT ---
             prompt = `
-          Act as a professional photo editor.
-          Task: Replace the outfit on the person in Image 1 with the outfit in Image 2.
-          
-          Instructions:
-          1. Remove the current clothes completely.
-          2. Fit the new outfit naturally onto the person's body.
-          3. STRICTLY preserve the face, hair, and skin tone. Do not retouch the face.
-          4. Ensure the background remains unchanged.
+        Act as a photo editor. Replace outfit.
+        Input 1: Model.
+        Input 2: Outfit.
+        
+        Instructions:
+        1. Keep face/hair 100% identical.
+        2. Replace current clothes with Outfit (Input 2).
+        3. Realistic fit and drape.
         `;
+
+        } else if (jewelryItem.type === 'set') {
+            // --- JEWELRY SET PROMPT ---
+            prompt = `
+        Act as a professional jewelry editor.
+        Task: Virtual Try-On of a Full Jewelry Set.
+        
+        Input 1: Customer.
+        Input 2: Jewelry Set (Contains Necklace AND Earrings).
+
+        CRITICAL CLEANUP:
+        - If Customer is wearing OLD necklace or earrings, ERASE THEM completely.
+        - Restore skin texture before placing new items.
+
+        PLACEMENT RULES:
+        1. Identify the Necklace in Input 2: Place it around the neck, resting on the chest. Show full length.
+        2. Identify the Earrings in Input 2: Place them hanging vertically from the earlobes.
+
+        STRICT REQUIREMENTS:
+        - Face & Skin Identity: 100% Unchanged.
+        - Product Accuracy: Use exact design from Input 2.
+        - Physics: Natural gravity and shadows.
+        `;
+
         } else {
-            // --- JEWELRY PROMPT (With Removal Logic) ---
+            // --- SINGLE ITEM PROMPT ---
             const typeName = jewelryItem.type === 'earring' ? 'Earrings' : 'Necklace';
             const targetArea = jewelryItem.type === 'earring' ? 'ears' : 'neck';
 
             let pos;
             if (jewelryItem.type === 'necklace') {
-                pos = "The necklace must rest naturally on the skin of the upper chest/sternum. Show the full length of the chain. Do not crop it.";
+                pos = "The necklace must rest naturally on the skin of the upper chest/sternum. Show the full length of the chain.";
             } else {
                 pos = "The earrings must hang vertically from the earlobes.";
             }
 
             prompt = `
-          Act as a professional jewelry retoucher.
-          Task: Virtual Try-On.
-          
-          Input 1: Customer Photo.
-          Input 2: ${typeName} Product.
-          
-          CRITICAL STEP - CLEANUP:
-          If the customer is already wearing any jewelry on their ${targetArea}, REMOVE IT FIRST. Erase the old jewelry and reconstruct the skin texture underneath.
-          
-          EXECUTION:
-          1. Place the new ${typeName} (Input 2) onto the customer.
-          2. Placement: ${pos}
-          3. Identity: Keep the customer's face 100% identical.
-          4. Product: Use the exact design from Input 2.
-          5. Physics: Apply natural gravity and shadows.
+        Act as a professional jewelry retoucher.
+        Task: Virtual Try-On (${typeName}).
+        
+        Input 1: Customer.
+        Input 2: ${typeName}.
+        
+        CRITICAL CLEANUP:
+        - Remove any existing jewelry on ${targetArea}.
+        
+        EXECUTION:
+        1. Place ${typeName} (Input 2) onto customer.
+        2. Placement: ${pos}
+        3. Identity: Keep face 100% identical.
+        4. Product: Exact design from Input 2.
         `;
         }
 
-        console.log("Step 2: Starting Runway Task (Model: gemini_2.5_flash)...");
+        console.log("Step 2: Starting Runway Task (Gemini 2.5 Flash)...");
         const taskId = await startImageGeneration(prompt, [baseUri, jewelryUri], apiKey);
 
         console.log(`Step 3: Polling Task ID: ${taskId}`);

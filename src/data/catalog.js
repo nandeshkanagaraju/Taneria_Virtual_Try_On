@@ -7,12 +7,26 @@ export const JEWELRY_CATALOG = [
     { id: 4, name: "Blossom Crest Gold Necklace", type: "necklace", src: "/images/necklace6.png" },
 ];
 
+export const JEWELRY_SETS_CATALOG = [
+    {
+        id: 201,
+        name: "Filigree Charm Gold Necklace Set",
+        type: "set",
+        src: "/images/necklaceset1.png"
+    },
+    {
+        id: 202,
+        name: "Moyurer Mohima Gold Choker",
+        type: "set",
+        src: "images/necklaceset2.png"
+    }
+];
+
 export const APPAREL_CATALOG = [
     {
         id: 101,
         name: "Yellow Floral Kurta Set",
         type: "clothing",
-        // This is the image you shared
         src: "/images/kurtha1.jpg"
     },
     {

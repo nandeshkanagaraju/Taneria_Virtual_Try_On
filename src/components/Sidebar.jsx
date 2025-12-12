@@ -1,7 +1,7 @@
 import React from 'react';
-import { Upload, User, Trash2, ZoomIn, ZoomOut, RotateCw, Sparkles, Plus, Shirt } from 'lucide-react';
-// IMPORT BOTH CATALOGS
-import { JEWELRY_CATALOG, APPAREL_CATALOG } from '../data/catalog';
+import { Upload, User, Trash2, ZoomIn, ZoomOut, RotateCw, Sparkles, Plus, Shirt, Layers } from 'lucide-react';
+// IMPORT ALL CATALOGS
+import { JEWELRY_CATALOG, JEWELRY_SETS_CATALOG, APPAREL_CATALOG } from '../data/catalog';
 
 export default function Sidebar({
                                     onUpload,
@@ -14,7 +14,6 @@ export default function Sidebar({
                                     onDirectTryOn
                                 }) {
 
-    // Helper function to render a grid item
     const renderItem = (item) => (
         <div
             key={item.id}
@@ -22,7 +21,7 @@ export default function Sidebar({
         >
             <div
                 onClick={() => onAddItem(item)}
-                className="h-32 flex items-center justify-center bg-gray-50 rounded-lg mb-2 p-1 cursor-pointer overflow-hidden"
+                className="h-28 flex items-center justify-center bg-gray-50 rounded-lg mb-2 p-1 cursor-pointer overflow-hidden"
             >
                 <img src={item.src} alt={item.name} className="h-full w-full object-contain drop-shadow-sm group-hover:scale-105 transition-transform" />
             </div>
@@ -85,10 +84,20 @@ export default function Sidebar({
                     </div>
                 </div>
 
-                {/* 3. Apparel Section (NEW) */}
+                {/* 3. Jewelry Sets Section (NEW) */}
                 <div>
                     <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <Shirt size={14} /> 3. Apparel / Sarees
+                        <Layers size={14} /> 3. Jewelry Sets
+                    </h2>
+                    <div className="grid grid-cols-2 gap-3">
+                        {JEWELRY_SETS_CATALOG.map(renderItem)}
+                    </div>
+                </div>
+
+                {/* 4. Apparel Section */}
+                <div>
+                    <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Shirt size={14} /> 4. Apparel / Sarees
                     </h2>
                     <div className="grid grid-cols-2 gap-3">
                         {APPAREL_CATALOG.map(renderItem)}
@@ -97,7 +106,7 @@ export default function Sidebar({
 
             </div>
 
-            {/* 4. Controls */}
+            {/* 5. Controls */}
             <div className="p-4 bg-gray-50 border-t border-gray-200">
                 <div className="flex justify-between gap-2">
                     <ControlButton icon={<ZoomIn size={18} />} onClick={() => onResize(10)} disabled={!selectedId} />
