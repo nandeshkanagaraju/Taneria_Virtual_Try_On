@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Layers, CheckCircle, ShieldCheck } from 'lucide-react';
 // IMPORT RUNWAY SERVICE
-import { performVirtualTryOn } from '../services/runwayService';
+import { performVirtualTryOn } from '../services/runwayService.js';
 
 export default function AIModal({ isOpen, onClose, baseImage, jewelryItem }) {
     // Automatically grab the key from .env

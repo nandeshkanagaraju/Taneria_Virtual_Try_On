@@ -1,7 +1,7 @@
 import React from 'react';
 import { Upload, User, Trash2, ZoomIn, ZoomOut, RotateCw, Sparkles, Plus, Shirt, Layers } from 'lucide-react';
 // IMPORT ALL CATALOGS
-import { JEWELRY_CATALOG, JEWELRY_SETS_CATALOG, APPAREL_CATALOG } from '../data/catalog';
+import { JEWELRY_CATALOG, JEWELRY_SETS_CATALOG, APPAREL_CATALOG } from '../data/catalog.js';
 
 export default function Sidebar({
                                     onUpload,
