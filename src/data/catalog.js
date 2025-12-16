@@ -22,6 +22,6 @@ export const EYEWEAR_CATALOG = [
 
 export const APPAREL_CATALOG = [
     { id: 101, name: "Yellow Floral Kurta", type: "clothing", src: "/images/kurtha1.jpg" },
-    { id: 102, name: "Red Silk Saree", type: "clothing", src: "/images/saree2.png" },
-    { id: 103, name: "Blue Designer Saree", type: "clothing", src: "/images/saree1.png" }
+    { id: 102, name: "Red Silk Saree", type: "clothing", src: "/images/sareemodel1.png" },
+    { id: 103, name: "Off White Pure Cotton Mulmul ", type: "clothing", src: "/images/sareemodel2.png" }
 ];

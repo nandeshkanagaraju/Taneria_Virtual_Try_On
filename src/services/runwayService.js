@@ -138,20 +138,21 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
         if (jewelryItem.type === 'clothing') {
             // 1. CLOTHING (SAREE/DRESS)
             prompt = `
-            Task: High-Fidelity Garment Transfer.
-            Input 1: Model (Customer).
-            Input 2: Garment (Product).
+            Task: High-Fidelity Garment Transfer (Saree/Dress).
+            Input 1: Customer (Model).
+            Input 2: Garment (Product - Saree and Blouse).
             
             FRAMING: Maintain exact aspect ratio. Do not crop.
             
             INSTRUCTIONS:
-            1. Texture Map: Wrap the EXACT fabric and pattern from Input 2 onto the Model.
-            2. Identity: Keep the Model's face, body, and background 100% identical.
+            1. Texture Map: Wrap the EXACT fabric and pattern from Input 2 onto the Model. This includes the **Saree** and the **Blouse**.
+            2. Pose Lock: The Model's body pose, hand position, and head angle MUST be preserved from Input 1.
+            3. Identity Lock: Keep the Model's face, skin tone, hair, and background 100% identical.
             
             REALISM & FIDELITY:
             - Photographic quality: Ultra-realistic, high-resolution, sharp focus, professional studio lighting.
-            - Seamless integration: The new garment must be perfectly blended, matching the original's lighting, shadow, and color temperature.
-            - Material accuracy: Ensure natural fabric folds, drapes, and wrinkles that correspond to the Model's pose and body shape.
+            - Seamless integration: The new garment (Saree and Blouse) must be perfectly blended, matching the original's lighting, shadow, and color temperature.
+            - Material accuracy: Ensure natural fabric folds, drapes, and wrinkles that correspond to the Model's pose and body shape. For Saree, ensure the pallu drapes naturally over the shoulder and arm.
             `;
 
         } else if (jewelryItem.type === 'eyewear') {
