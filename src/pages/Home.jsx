@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-
-// --- FIX: UPDATED PATHS (Added "../") ---
-import Header from '../components/Header.jsx';
-import Sidebar from '../components/Sidebar.jsx';
-import Canvas from '../components/Canvas.jsx';
-import AIModal from '../components/AIModal.jsx';
+import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
+import Canvas from '../components/Canvas';
+import AIModal from '../components/AIModal';
+import { mergeImages } from '../utils/imageMerger'; // IMPORT UTILITY
 
 export default function Home() {
     const [baseImage, setBaseImage] = useState(null);
@@ -14,11 +13,10 @@ export default function Home() {
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const containerRef = useRef(null);
 
-    // AI Modal State
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
     const [activeAIItem, setActiveAIItem] = useState(null);
 
-    // --- Handlers ---
+    // ... (Keep existing handlers like handleImageUpload, etc.) ...
     const handleImageUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -34,19 +32,11 @@ export default function Home() {
 
     const handleGarmentUpload = (e) => {
         const file = e.target.files[0];
-        if (!baseImage) {
-            alert("Please upload the Customer/Model photo first!");
-            return;
-        }
+        if (!baseImage) { alert("Please upload the Customer/Model photo first!"); return; }
         if (file) {
             const reader = new FileReader();
             reader.onload = (event) => {
-                const customItem = {
-                    id: 'custom-upload',
-                    name: "Custom Uploaded Saree",
-                    type: 'clothing',
-                    src: event.target.result
-                };
+                const customItem = { id: 'custom-upload', name: "Custom Saree", type: 'clothing', src: event.target.result };
                 setActiveAIItem(customItem);
                 setIsAIModalOpen(true);
             };
@@ -60,81 +50,61 @@ export default function Home() {
         setSelectedId(null);
     };
 
+    // ... (Keep addItem, updateItem, removeItem, etc.) ...
     const addItem = (item) => {
-        if (!baseImage) {
-            alert("Please upload a photo first!");
-            return;
-        }
-        const newItem = {
-            uid: Date.now(),
-            ...item,
-            x: 100,
-            y: 100,
-            size: 150,
-            rotation: 0
-        };
+        if (!baseImage) { alert("Please upload a photo first!"); return; }
+        const newItem = { uid: Date.now(), ...item, x: 100, y: 100, size: 150, rotation: 0 };
         setPlacedItems([...placedItems, newItem]);
         setSelectedId(newItem.uid);
     };
 
-    const handleDirectTryOn = (item) => {
-        if (!baseImage) {
-            alert("Please upload a photo of the customer first!");
+    // --- NEW HANDLER FOR COMBO ---
+    const handleTryOnCombo = async () => {
+        const necklace = placedItems.find(i => i.type === 'necklace');
+        const earring = placedItems.find(i => i.type === 'earring');
+
+        if (!necklace || !earring) {
+            alert("Please add both a Necklace and Earrings to the canvas first!");
             return;
         }
+
+        try {
+            // Merge the two images into one
+            const mergedSrc = await mergeImages(necklace.src, earring.src);
+
+            // Create a temporary "custom combo" item
+            const comboItem = {
+                id: 'combo-' + Date.now(),
+                name: "Custom Jewelry Set",
+                type: 'custom_combo', // Triggers logic in jewelryService
+                src: mergedSrc
+            };
+
+            setActiveAIItem(comboItem);
+            setIsAIModalOpen(true);
+        } catch (err) {
+            console.error("Failed to merge images", err);
+            alert("Error preparing images for AI.");
+        }
+    };
+
+    const handleDirectTryOn = (item) => {
+        if (!baseImage) { alert("Please upload a photo first!"); return; }
         setActiveAIItem(item);
         setIsAIModalOpen(true);
     };
 
-    const updateItem = (uid, updates) => {
-        setPlacedItems(items => items.map(item => item.uid === uid ? { ...item, ...updates } : item));
-    };
-
-    const removeItem = () => {
-        if (selectedId) {
-            setPlacedItems(items => items.filter(i => i.uid !== selectedId));
-            setSelectedId(null);
-        }
-    };
-
-    const handleResize = (delta) => {
-        if (!selectedId) return;
-        const item = placedItems.find(i => i.uid === selectedId);
-        if (item) updateItem(selectedId, { size: Math.max(50, item.size + delta) });
-    };
-
-    const handleRotate = () => {
-        if (!selectedId) return;
-        const item = placedItems.find(i => i.uid === selectedId);
-        if (item) updateItem(selectedId, { rotation: item.rotation + 15 });
-    };
-
-    // Dragging Logic
-    const handleMouseDown = (e, uid) => {
-        e.stopPropagation();
-        setSelectedId(uid);
-        setIsDragging(true);
-        const item = placedItems.find(i => i.uid === uid);
-        setDragOffset({ x: e.clientX - item.x, y: e.clientY - item.y });
-    };
+    const updateItem = (uid, updates) => setPlacedItems(items => items.map(item => item.uid === uid ? { ...item, ...updates } : item));
+    const removeItem = () => { if (selectedId) { setPlacedItems(items => items.filter(i => i.uid !== selectedId)); setSelectedId(null); } };
+    const handleResize = (delta) => { if (selectedId) { const item = placedItems.find(i => i.uid === selectedId); if (item) updateItem(selectedId, { size: Math.max(50, item.size + delta) }); } };
+    const handleRotate = () => { if (selectedId) { const item = placedItems.find(i => i.uid === selectedId); if (item) updateItem(selectedId, { rotation: item.rotation + 15 }); } };
+    const handleMouseDown = (e, uid) => { e.stopPropagation(); setSelectedId(uid); setIsDragging(true); const item = placedItems.find(i => i.uid === uid); setDragOffset({ x: e.clientX - item.x, y: e.clientY - item.y }); };
 
     useEffect(() => {
-        const handleMouseMove = (e) => {
-            if (isDragging && selectedId && containerRef.current) {
-                const newX = e.clientX - dragOffset.x;
-                const newY = e.clientY - dragOffset.y;
-                updateItem(selectedId, { x: newX, y: newY });
-            }
-        };
+        const handleMouseMove = (e) => { if (isDragging && selectedId && containerRef.current) { const newX = e.clientX - dragOffset.x; const newY = e.clientY - dragOffset.y; updateItem(selectedId, { x: newX, y: newY }); } };
         const handleMouseUp = () => setIsDragging(false);
-        if (isDragging) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-        }
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
+        if (isDragging) { window.addEventListener('mousemove', handleMouseMove); window.addEventListener('mouseup', handleMouseUp); }
+        return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
     }, [isDragging, selectedId, dragOffset]);
 
     const getAIItem = () => {
@@ -158,6 +128,10 @@ export default function Home() {
                     selectedId={selectedId}
                     onDirectTryOn={handleDirectTryOn}
                     onUploadGarment={handleGarmentUpload}
+
+                    // Pass new props
+                    placedItems={placedItems}
+                    onTryOnCombo={handleTryOnCombo}
                 />
                 <Canvas
                     baseImage={baseImage}

@@ -139,6 +139,29 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
         - Material accuracy: Ensure natural fabric folds, drapes, and wrinkles that correspond to the Model's pose and body shape.
         `;
 
+        } else if (jewelryItem.type === 'custom_combo') {
+            prompt = `
+            Task: Technical Photo Composite (Multi-Item Mix & Match).
+            Input 1: Customer.
+            Input 2: Combined Jewelry Reference (Contains separate Necklace AND Earrings).
+
+            CRITICAL ANALYSIS:
+            - Input 2 contains two separate items merged side-by-side.
+            - Identify the Necklace object. Identify the Earring objects.
+
+            CRITICAL CLEANUP:
+            - Erase ALL existing jewelry from the Customer (Neck and Ears).
+            - Restore skin texture before placing new items.
+
+            PLACEMENT INSTRUCTIONS:
+            1. NECKLACE: Take the necklace from Input 2. Place it on the Customer's upper chest/sternum.
+            2. EARRINGS: Take the earrings from Input 2. Hang them from the Customer's earlobes.
+
+            STRICT RULES:
+            - IDENTITY: Keep Customer's face 100% identical.
+            - DESIGN: Copy pixel-for-pixel from Input 2.
+            - COLOR LOCK: Do not change stone colors.
+            `;
         } else if (jewelryItem.type === 'set') {
             prompt = `
         Task: Technical Photo Composite (Jewelry Set).
