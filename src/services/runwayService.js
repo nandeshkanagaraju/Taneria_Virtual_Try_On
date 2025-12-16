@@ -4,17 +4,22 @@
 const API_BASE = "/runway-api";
 const RUNWAY_VERSION = "2024-11-06";
 
-// Updated to return Dimensions + Base64
+// --- HELPER 1: Image Processing ---
 const resizeAndConvertImage = (url) => {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.crossOrigin = "Anonymous";
+
+        // Handle CORS for remote images
+        if (url.startsWith('http')) {
+            img.crossOrigin = "Anonymous";
+        }
+
         img.onload = () => {
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
 
-            // Limit max size to 1536 to keep quality high but within API limits
+            // Limit max size to 1536 for best quality/performance balance
             const MAX_SIZE = 1536;
 
             if (width > height) {
@@ -26,6 +31,9 @@ const resizeAndConvertImage = (url) => {
             canvas.width = width;
             canvas.height = height;
             const ctx = canvas.getContext('2d');
+
+            // Clean slate
+            ctx.clearRect(0, 0, width, height);
             ctx.drawImage(img, 0, 0, width, height);
 
             resolve({
@@ -35,24 +43,30 @@ const resizeAndConvertImage = (url) => {
             });
         };
         img.onerror = () => reject("Could not load image");
-        img.src = url;
+
+        // Cache busting for remote URLs to prevent canvas tainting
+        if (url.startsWith('http')) {
+            img.src = `${url}?t=${new Date().getTime()}`;
+        } else {
+            img.src = url;
+        }
     });
 };
 
-// Helper to pick the best allowed ratio
+// --- HELPER 2: Ratio Selection ---
 const getBestRatio = (width, height) => {
     const aspect = width / height;
-
-    // Logic: Map the user's aspect ratio to the closest valid Runway option
+    // Gemini supported ratios
     if (aspect > 1.25) {
         return "1344:768"; // Landscape
     } else if (aspect < 0.8) {
-        return "768:1344"; // Portrait (Phone Mode)
+        return "768:1344"; // Portrait
     } else {
-        return "1024:1024"; // Square (Default)
+        return "1024:1024"; // Square
     }
 };
 
+// --- HELPER 3: API Calls ---
 async function startImageGeneration(prompt, imageUris, apiKey, targetRatio) {
     const response = await fetch(`${API_BASE}/v1/text_to_image`, {
         method: "POST",
@@ -63,11 +77,8 @@ async function startImageGeneration(prompt, imageUris, apiKey, targetRatio) {
         },
         body: JSON.stringify({
             model: "gemini_2.5_flash",
-
-            // DYNAMIC RATIO HERE
             ratio: targetRatio,
-
-            promptText: prompt.substring(0, 999),
+            promptText: prompt.substring(0, 999), // Safety limit
             referenceImages: imageUris.map(uri => ({ uri })),
             seed: Math.floor(Math.random() * 1000000)
         })
@@ -107,11 +118,12 @@ async function pollTask(taskId, apiKey) {
     }
 }
 
+// --- MAIN FUNCTION ---
 export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
     try {
         console.log("Step 1: Analyzing Image Dimensions...");
 
-        // Get dimensions of the USER image to determine ratio
+        // Process images
         const userImgData = await resizeAndConvertImage(baseImage);
         const itemImgData = await resizeAndConvertImage(jewelryItem.src);
 
@@ -121,25 +133,58 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
 
         let prompt;
 
+        // --- PROMPT LOGIC SWITCHER ---
+
         if (jewelryItem.type === 'clothing') {
+            // 1. CLOTHING (SAREE/DRESS)
             prompt = `
-        Task: High-Fidelity Garment Transfer.
-        Input 1: Model (Customer).
-        Input 2: Garment (Product).
-        
-        FRAMING: Maintain exact aspect ratio. Do not crop.
-        
-        INSTRUCTIONS:
-        1. Texture Map: Wrap the EXACT fabric and pattern from Input 2 onto the Model.
-        2. Identity: Keep the Model's face, body, and background 100% identical.
-        
-        REALISM & FIDELITY:
-        - Photographic quality: Ultra-realistic, high-resolution, sharp focus, professional studio lighting.
-        - Seamless integration: The new garment must be perfectly blended, matching the original's lighting, shadow, and color temperature.
-        - Material accuracy: Ensure natural fabric folds, drapes, and wrinkles that correspond to the Model's pose and body shape.
-        `;
+            Task: High-Fidelity Garment Transfer.
+            Input 1: Model (Customer).
+            Input 2: Garment (Product).
+            
+            FRAMING: Maintain exact aspect ratio. Do not crop.
+            
+            INSTRUCTIONS:
+            1. Texture Map: Wrap the EXACT fabric and pattern from Input 2 onto the Model.
+            2. Identity: Keep the Model's face, body, and background 100% identical.
+            
+            REALISM & FIDELITY:
+            - Photographic quality: Ultra-realistic, high-resolution, sharp focus, professional studio lighting.
+            - Seamless integration: The new garment must be perfectly blended, matching the original's lighting, shadow, and color temperature.
+            - Material accuracy: Ensure natural fabric folds, drapes, and wrinkles that correspond to the Model's pose and body shape.
+            `;
+
+        } else if (jewelryItem.type === 'eyewear') {
+            // 2. EYEWEAR (TITAN GLASSES)
+            prompt = `
+            Task: Technical Photo Composite (Eyewear Virtual Try-On).
+            Input 1: Customer (Face).
+            Input 2: Eyewear Product (Glasses/Sunglasses).
+
+            CRITICAL CLEANUP:
+            - If the Customer is already wearing glasses, ERASE THEM completely and reconstruct the eyes/bridge of the nose.
+
+            PLACEMENT INSTRUCTIONS:
+            1. BRIDGE: Place the bridge of the glasses exactly on the bridge of the Customer's nose.
+            2. EARS: The arms (temples) of the glasses must go OVER the ears, not through the head.
+            3. ALIGNMENT: Align the frame horizontally with the eyes.
+
+            STRICT RULES:
+            1. IDENTITY: Keep the Customer's face, skin tone, and hair 100% IDENTICAL.
+            2. PRODUCT: Use the EXACT design from Input 2 (Frame shape, color, and lens color).
+            3. TRANSPARENCY: 
+               - If Input 2 has clear lenses, Customer's eyes MUST be visible.
+               - If Input 2 has dark lenses, eyes should be hidden/faint.
+
+            REALISM & FIDELITY:
+            - Photographic quality: Ultra-realistic, high-resolution, sharp focus, professional studio lighting.
+            - Seamless integration: The eyewear must be perfectly blended, matching the original's lighting, shadow, and color temperature.
+            - Material accuracy: Ensure realistic reflections, specular highlights, and high-polish metal sheen on the frame. Cast realistic, soft shadows onto the skin.
+            - Fit: Ensure the fit looks natural.
+            `;
 
         } else if (jewelryItem.type === 'custom_combo') {
+            // 3. MIX & MATCH (NECKLACE + EARRING)
             prompt = `
             Task: Technical Photo Composite (Multi-Item Mix & Match).
             Input 1: Customer.
@@ -162,34 +207,37 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
             - DESIGN: Copy pixel-for-pixel from Input 2.
             - COLOR LOCK: Do not change stone colors.
             `;
+
         } else if (jewelryItem.type === 'set') {
+            // 4. JEWELRY SETS
             prompt = `
-        Task: Technical Photo Composite (Jewelry Set).
-        Input 1: Customer.
-        Input 2: Jewelry Set (Product).
+            Task: Technical Photo Composite (Jewelry Set).
+            Input 1: Customer.
+            Input 2: Jewelry Set (Product).
 
-        FRAMING:
-        - DO NOT CROP. Maintain full view of chest/shoulders.
+            FRAMING:
+            - DO NOT CROP. Maintain full view of chest/shoulders.
 
-        CRITICAL CLEANUP:
-        - If Customer is wearing OLD jewelry, ERASE IT completely and cleanly.
+            CRITICAL CLEANUP:
+            - If Customer is wearing OLD jewelry, ERASE IT completely and cleanly.
 
-        STRICT RULES:
-        1. NO NEW GEMS: Use ONLY the design, cut, and material from Input 2.
-        2. COLOR LOCK: Do not change stone or metal colors.
-        3. IDENTITY: Keep face, skin tone, hair, and background 100% identical.
+            STRICT RULES:
+            1. NO NEW GEMS: Use ONLY the design, cut, and material from Input 2.
+            2. COLOR LOCK: Do not change stone or metal colors.
+            3. IDENTITY: Keep face, skin tone, hair, and background 100% identical.
 
-        PLACEMENT:
-        - Necklace: Rest naturally on the upper chest/sternum. Show full length.
-        - Earrings: Hang vertically from the earlobes.
-        
-        REALISM & FIDELITY:
-        - Photographic quality: Ultra-realistic, high-resolution, sharp focus, professional studio lighting.
-        - Seamless integration: The jewelry must be perfectly blended, matching the original's lighting, shadow, and color temperature.
-        - Material accuracy: Ensure realistic reflections, specular highlights, and metal sheen on the jewelry. Cast realistic, soft shadows onto the skin.
-        `;
+            PLACEMENT:
+            - Necklace: Rest naturally on the upper chest/sternum. Show full length.
+            - Earrings: Hang vertically from the earlobes.
+            
+            REALISM & FIDELITY:
+            - Photographic quality: Ultra-realistic, high-resolution, sharp focus, professional studio lighting.
+            - Seamless integration: The jewelry must be perfectly blended, matching the original's lighting, shadow, and color temperature.
+            - Material accuracy: Ensure realistic reflections, specular highlights, and metal sheen on the jewelry. Cast realistic, soft shadows onto the skin.
+            `;
 
         } else {
+            // 5. SINGLE JEWELRY (NECKLACE / EARRING)
             const typeName = jewelryItem.type === 'earring' ? 'Earrings' : 'Necklace';
             const targetArea = jewelryItem.type === 'earring' ? 'ears' : 'neck';
 
@@ -201,31 +249,30 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
             }
 
             prompt = `
-        Task: Technical Photo Composite (${typeName}).
-        Input 1: Customer.
-        Input 2: ${typeName} (Product).
-        
-        FRAMING RULE: 
-        - KEEP ORIGINAL ASPECT RATIO. 
-        - DO NOT CROP THE BOTTOM. 
-        
-        CRITICAL CLEANUP:
-        - Remove any existing jewelry on ${targetArea} completely and cleanly.
-        
-        STRICT RULES:
-        1. NO NEW GEMS: Use ONLY the design, cut, and material from Input 2.
-        2. IDENTITY: Keep face, skin tone, hair, and background 100% identical.
-        3. PLACEMENT: ${pos}
-        
-        REALISM & FIDELITY:
-        - Photographic quality: Ultra-realistic, high-resolution, sharp focus, professional studio lighting.
-        - Seamless integration: The jewelry must be perfectly blended, matching the original's lighting, shadow, and color temperature.
-        - Material accuracy: Ensure realistic reflections, specular highlights, and metal sheen on the jewelry. Cast realistic, soft shadows onto the skin.
-        `;
+            Task: Technical Photo Composite (${typeName}).
+            Input 1: Customer.
+            Input 2: ${typeName} (Product).
+            
+            FRAMING RULE: 
+            - KEEP ORIGINAL ASPECT RATIO. 
+            - DO NOT CROP THE BOTTOM. 
+            
+            CRITICAL CLEANUP:
+            - Remove any existing jewelry on ${targetArea} completely and cleanly.
+            
+            STRICT RULES:
+            1. NO NEW GEMS: Use ONLY the design, cut, and material from Input 2.
+            2. IDENTITY: Keep face, skin tone, hair, and background 100% identical.
+            3. PLACEMENT: ${pos}
+            
+            REALISM & FIDELITY:
+            - Photographic quality: Ultra-realistic, high-resolution, sharp focus, professional studio lighting.
+            - Seamless integration: The jewelry must be perfectly blended, matching the original's lighting, shadow, and color temperature.
+            - Material accuracy: Ensure realistic reflections, specular highlights, and metal sheen on the jewelry. Cast realistic, soft shadows onto the skin.
+            `;
         }
 
         console.log("Step 2: Starting Runway Task...");
-        // Pass the calculated ratio
         const taskId = await startImageGeneration(prompt, [userImgData.base64, itemImgData.base64], apiKey, dynamicRatio);
 
         console.log(`Step 3: Polling Task ID: ${taskId}`);
@@ -236,3 +283,8 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
         throw error;
     }
 }
+
+// Named exports for compatibility if components import specific names
+export const performJewelryTryOn = performVirtualTryOn;
+export const performApparelTryOn = performVirtualTryOn;
+export const performEyewearTryOn = performVirtualTryOn;

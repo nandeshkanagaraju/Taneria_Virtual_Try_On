@@ -1,6 +1,6 @@
 import React from 'react';
-import { Upload, User, Trash2, ZoomIn, ZoomOut, RotateCw, Sparkles, Plus, Shirt, Layers, Camera } from 'lucide-react';
-import { JEWELRY_CATALOG, JEWELRY_SETS_CATALOG, APPAREL_CATALOG } from '../data/catalog';
+import { Upload, User, Trash2, ZoomIn, ZoomOut, RotateCw, Sparkles, Plus, Shirt, Layers, Camera, Glasses } from 'lucide-react';
+import { JEWELRY_CATALOG, JEWELRY_SETS_CATALOG, APPAREL_CATALOG, EYEWEAR_CATALOG } from '../data/catalog';
 
 export default function Sidebar({
                                     onUpload,
@@ -12,26 +12,37 @@ export default function Sidebar({
                                     selectedId,
                                     onDirectTryOn,
                                     onUploadGarment,
-
-                                    // NEW PROPS
                                     onTryOnCombo,
                                     placedItems = []
                                 }) {
 
-    // Logic to check if user has selected both items on canvas
+    // Logic to check if user has selected both items on canvas for Mix & Match
     const hasNecklace = placedItems.some(i => i.type === 'necklace');
     const hasEarring = placedItems.some(i => i.type === 'earring');
     const isComboReady = hasNecklace && hasEarring;
 
+    // Helper to render individual item cards
     const renderItem = (item) => (
         <div key={item.id} className="relative group bg-white border border-gray-200 rounded-xl p-3 hover:shadow-lg hover:border-purple-500 transition-all duration-300">
             <div onClick={() => onAddItem(item)} className="h-28 flex items-center justify-center bg-gray-50 rounded-lg mb-2 p-1 cursor-pointer overflow-hidden">
                 <img src={item.src} alt={item.name} className="h-full w-full object-contain drop-shadow-sm group-hover:scale-105 transition-transform" />
             </div>
             <p className="text-xs font-medium text-center text-gray-700 truncate mb-1">{item.name}</p>
+
+            {/* Hover Overlay */}
             <div className="absolute inset-0 bg-white/95 backdrop-blur-sm rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2 z-10">
-                <button onClick={(e) => { e.stopPropagation(); onDirectTryOn(item); }} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold py-2.5 rounded-lg shadow-md hover:scale-105 transition flex items-center justify-center gap-1"><Sparkles size={12} /> TRY ON</button>
-                <button onClick={(e) => { e.stopPropagation(); onAddItem(item); }} className="w-full bg-gray-100 text-gray-700 text-[10px] font-bold py-2.5 rounded-lg hover:bg-gray-200 transition flex items-center justify-center gap-1"><Plus size={12} /> ADD</button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onDirectTryOn(item); }}
+                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold py-2.5 rounded-lg shadow-md hover:scale-105 transition flex items-center justify-center gap-1"
+                >
+                    <Sparkles size={12} /> TRY ON
+                </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onAddItem(item); }}
+                    className="w-full bg-gray-100 text-gray-700 text-[10px] font-bold py-2.5 rounded-lg hover:bg-gray-200 transition flex items-center justify-center gap-1"
+                >
+                    <Plus size={12} /> ADD
+                </button>
             </div>
         </div>
     );
@@ -39,7 +50,7 @@ export default function Sidebar({
     return (
         <aside className="w-full md:w-80 bg-white border-r border-gray-200 flex flex-col shadow-xl z-20 h-full relative">
 
-            {/* 1. Upload */}
+            {/* 1. Customer Upload Section */}
             <div className="p-6 border-b border-gray-100">
                 <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">1. Customer Model</h2>
                 <div className="flex gap-2">
@@ -55,7 +66,7 @@ export default function Sidebar({
                 </div>
             </div>
 
-            {/* NEW: MIX & MATCH SECTION */}
+            {/* 2. Mix & Match Studio (Always Visible) */}
             <div className="px-6 py-4 bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
                 <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <Layers size={14} /> Mix & Match Studio
@@ -94,12 +105,65 @@ export default function Sidebar({
                 </div>
             </div>
 
-            {/* REST OF SIDEBAR (Catalog, Controls) */}
+            {/* 3. Catalog Scrollable Area */}
             <div className="flex-1 overflow-y-auto p-6 scrollbar-hide space-y-8">
-                <div><h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles size={14} /> 2. Jewelry</h2><div className="grid grid-cols-2 gap-3">{JEWELRY_CATALOG.map(renderItem)}</div></div>
-                <div><h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Layers size={14} /> 3. Jewelry Sets</h2><div className="grid grid-cols-2 gap-3">{JEWELRY_SETS_CATALOG.map(renderItem)}</div></div>
-                <div><div className="flex justify-between items-center mb-4"><h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2"><Shirt size={14} /> 4. Apparel</h2></div><label className="mb-4 cursor-pointer block bg-purple-50 hover:bg-purple-100 border border-purple-200 border-dashed rounded-xl p-4 text-center transition group"><div className="w-10 h-10 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm group-hover:scale-110 transition"><Camera className="text-purple-600" size={20} /></div><h3 className="text-sm font-bold text-purple-900">Upload Your Saree</h3><p className="text-[10px] text-purple-600 mt-1">Try on your own photo</p><input type="file" onChange={onUploadGarment} accept="image/*" className="hidden" /></label><div className="grid grid-cols-2 gap-3">{APPAREL_CATALOG.map(renderItem)}</div></div>
+
+                {/* Titan Eyewear Section */}
+                <div>
+                    <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Glasses size={14} /> Titan Eyewear
+                    </h2>
+                    <div className="grid grid-cols-2 gap-3">
+                        {EYEWEAR_CATALOG.map(renderItem)}
+                    </div>
+                </div>
+
+                {/* Jewelry Section */}
+                <div>
+                    <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Sparkles size={14} /> Jewelry Collection
+                    </h2>
+                    <div className="grid grid-cols-2 gap-3">
+                        {JEWELRY_CATALOG.map(renderItem)}
+                    </div>
+                </div>
+
+                {/* Jewelry Sets */}
+                <div>
+                    <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Layers size={14} /> Jewelry Sets
+                    </h2>
+                    <div className="grid grid-cols-2 gap-3">
+                        {JEWELRY_SETS_CATALOG.map(renderItem)}
+                    </div>
+                </div>
+
+                {/* Apparel Section with Custom Upload */}
+                <div>
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                            <Shirt size={14} /> Apparel
+                        </h2>
+                    </div>
+
+                    {/* Custom Saree Upload Button */}
+                    <label className="mb-4 cursor-pointer block bg-purple-50 hover:bg-purple-100 border border-purple-200 border-dashed rounded-xl p-4 text-center transition group">
+                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm group-hover:scale-110 transition">
+                            <Camera className="text-purple-600" size={20} />
+                        </div>
+                        <h3 className="text-sm font-bold text-purple-900">Upload Your Saree</h3>
+                        <p className="text-[10px] text-purple-600 mt-1">Try on your own photo</p>
+                        <input type="file" onChange={onUploadGarment} accept="image/*" className="hidden" />
+                    </label>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        {APPAREL_CATALOG.map(renderItem)}
+                    </div>
+                </div>
+
             </div>
+
+            {/* 4. Controls Footer */}
             <div className="p-4 bg-gray-50 border-t border-gray-200">
                 <div className="flex justify-between gap-2">
                     <ControlButton icon={<ZoomIn size={18} />} onClick={() => onResize(10)} disabled={!selectedId} />
@@ -112,6 +176,7 @@ export default function Sidebar({
     );
 }
 
+// Helper Component for Control Buttons
 function ControlButton({ icon, onClick, disabled, danger }) {
     const baseClass = "flex-1 rounded-lg p-3 transition flex justify-center items-center disabled:opacity-50 disabled:cursor-not-allowed";
     const normalClass = "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-yellow-600 hover:border-yellow-500";
