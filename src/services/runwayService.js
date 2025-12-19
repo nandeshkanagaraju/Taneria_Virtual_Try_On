@@ -201,7 +201,8 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
 
             PLACEMENT INSTRUCTIONS:
             1. NECKLACE: Take the necklace from Input 2. Place it on the Customer's upper chest/sternum.
-            2. EARRINGS: Take the earrings from Input 2. Hang them from the Customer's earlobes.
+            2. EARRINGS: Take the earrings from Input 2.Hang them from the Customer's earlobes. Ensure the earrings are sized realistically to the customer's head and face, maintaining proper proportion. 
+
 
             STRICT RULES:
             - IDENTITY: Keep Customer's face 100% identical.
@@ -246,7 +247,7 @@ export async function performVirtualTryOn(baseImage, jewelryItem, apiKey) {
             if (jewelryItem.type === 'necklace') {
                 pos = "The necklace must rest naturally on the skin of the upper chest/sternum. Show the full length of the chain. Do not crop.";
             } else {
-                pos = "The earrings must hang vertically from the earlobes.";
+                pos = "Earrings must be attached precisely to the center of each earlobe piercing, hanging straight downward with natural gravity, scaled proportionally to the model’s ear and face (no oversized or floating appearance).";
             }
 
             prompt = `

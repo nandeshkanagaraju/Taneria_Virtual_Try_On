@@ -5,6 +5,11 @@ export const JEWELRY_CATALOG = [
     { id: 2, name: "Diamond Necklace", type: "necklace", src: "/images/necklace8.png" },
     { id: 3, name: "Diamond Earring", type: "earring", src: "/images/earring.png" },
     { id: 4, name: "Blossom Crest Gold", type: "necklace", src: "/images/necklace6.png" },
+    { id: 5, name: "Cheeky Glow Sapphire Necklace", type: "necklace", src: "/images/mia1.png" },
+    { id: 6, name: "Timeless Aura Gold & Diamond Necklace", type: "necklace", src: "/images/mia2.png" },
+    { id: 7, name: "Cupid Edit Whimsical Wings neckalce", type: "necklace", src: "/images/mia3.jpeg" },
+    { id: 8, name: "Royal Charm Diamond Jhumka", type: "earring", src: "/images/miae1.jpeg" },
+    { id: 9, name: "Cupid Edit Whimsical Wings", type: "earring", src: "/images/miae2.jpeg" }
 ];
 
 export const JEWELRY_SETS_CATALOG = [
